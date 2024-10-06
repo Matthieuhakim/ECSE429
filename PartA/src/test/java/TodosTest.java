@@ -44,6 +44,9 @@ public class TodosTest {
         }
     }
 
+
+    // Testing /todos APIs
+
     // GET /todos
     @Test
     public void testGetTodos() {
@@ -111,6 +114,7 @@ public class TodosTest {
         }
     }
 
+    // POST /todos no title
     @Test
     public void testPostTodosNoTitle(){
         JsonObject newTodo = new JsonObject();
@@ -202,6 +206,57 @@ public class TodosTest {
             e.printStackTrace();
         }
     }
+
+
+    // Testing /todos/:id APIs
+
+    // GET /todos/:id existing id
+    @Test
+    public void testGetTodosId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .GET()
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+
+            JsonArray todosList = jsonResponse.get("todos").getAsJsonArray();
+            Assertions.assertEquals(1, todosList.size());
+
+            JsonObject todo = todosList.get(0).getAsJsonObject();
+
+            Assertions.assertEquals("scan paperwork", todo.get("title").getAsString());
+            Assertions.assertEquals("", todo.get("description").getAsString());
+            Assertions.assertFalse(todo.get("doneStatus").getAsBoolean());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // GET /todos/:id non-existing id
+    @Test
+    public void testGetTodosIdNotFound() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/3"))
+                .GET()
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(NOT_FOUND, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // TODO: Add test for other methods of /todos/:id
+
+
+    // Testing /shutdown API
 
     // GET /shutdown
     @Test
