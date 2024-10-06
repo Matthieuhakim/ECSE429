@@ -70,6 +70,30 @@ public class TodosTest {
         }
     }
 
+    //TODO: Undocumented feature. Add another test that should return 400 error
+    // GET /todos?doneStatus=true
+    @Test
+    public void testGetTodosDoneStatusTrue() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos?doneStatus=true"))
+                .GET()
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+
+            // Check if the system returns its 1 element
+            JsonArray todosList = jsonResponse.get("todos").getAsJsonArray();
+            Assertions.assertEquals(0, todosList.size());
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
     // PUT /todos
     @Test
     public void testPutTodos() {
@@ -254,8 +278,7 @@ public class TodosTest {
     }
 
     // TODO: Add test for POST PUT DELETE of /todos/:id
-
-    // POST /todos/:id valid id no change
+    // POST /todos/:id valid id with no body
     @Test
     public void testPostTodosId() {
         HttpRequest request = HttpRequest.newBuilder()
@@ -277,7 +300,7 @@ public class TodosTest {
         }
     }
 
-    // POST /todos/:id valid id with change
+    // POST /todos/:id valid id with request body
     @Test
     public void testPostTodosIdChange() {
         JsonObject newTodo = new JsonObject();
@@ -415,4 +438,44 @@ public class TodosTest {
         Assertions.assertFalse(jar.isAlive(), "Process should be terminated after shutdown");
 
     }
+
+
+    // Testing malformed request
+
+    // Malformed JSON
+    @Test
+    public void testPostMalformedJson() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"title\": \"New Todo\""))
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(BAD_REQUEST, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Malformed XML
+    @Test
+    public void testPostMalformedXml() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos"))
+                .header("Content-Type", "application/xml")
+                .POST(HttpRequest.BodyPublishers.ofString("<title>New Todo</title>"))
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(BAD_REQUEST, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
