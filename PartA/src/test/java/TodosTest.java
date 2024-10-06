@@ -253,7 +253,147 @@ public class TodosTest {
         }
     }
 
-    // TODO: Add test for other methods of /todos/:id
+    // TODO: Add test for POST PUT DELETE of /todos/:id
+
+    // POST /todos/:id valid id no change
+    @Test
+    public void testPostTodosId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            JsonObject todo = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+            Assertions.assertEquals("scan paperwork", todo.get("title").getAsString());
+            Assertions.assertEquals("", todo.get("description").getAsString());
+            Assertions.assertFalse(todo.get("doneStatus").getAsBoolean());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // POST /todos/:id valid id with change
+    @Test
+    public void testPostTodosIdChange() {
+        JsonObject newTodo = new JsonObject();
+        newTodo.addProperty("title", "New Title");
+        newTodo.addProperty("doneStatus", true);
+        newTodo.addProperty("description", "New Description");
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(newTodo.toString()))
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+            Assertions.assertEquals("New Title", jsonResponse.get("title").getAsString());
+            Assertions.assertEquals("New Description", jsonResponse.get("description").getAsString());
+            Assertions.assertTrue(jsonResponse.get("doneStatus").getAsBoolean());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // POST /todos/:id invalid id
+    @Test
+    public void testPostTodosInvalidId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/3"))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(NOT_FOUND, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // OPTIONS /todos/:id
+    @Test
+    public void testOptionsTodosId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .method("OPTIONS", HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+            Assertions.assertEquals("OPTIONS, GET, HEAD, POST, PUT, DELETE", response.headers().firstValue("Allow").get());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // HEAD /todos/:id valid id
+    @Test
+    public void testHeadTodosId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+            Assertions.assertEquals("", response.body());
+            Assertions.assertEquals("application/json", response.headers().firstValue("Content-Type").get());
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // HEAD /todos/:id invalid id
+    @Test
+    public void testHeadTodosIdNotFound() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/3"))
+                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(NOT_FOUND, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // PATCH /todos/:id
+    @Test
+    public void testPatchTodosId() {
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .header("Content-Type", "application/json")
+                .method("PATCH", HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(METHOD_NOT_ALLOWED, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 
 
     // Testing /shutdown API
@@ -265,18 +405,14 @@ public class TodosTest {
                 .uri(URI.create(baseURL + "/shutdown"))
                 .GET()
                 .build();
-        try{
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(request, HttpResponse.BodyHandlers.ofString());
-
-            Assertions.assertEquals(SUCCESS, response.statusCode());
-
-            sleep(sleepTime);
-
-            Assertions.assertFalse(jar.isAlive(), "Process should be terminated after shutdown");
-
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+        try {
+            HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.discarding());
+        }catch (IOException | InterruptedException e){
+            System.out.println("Expected connection error due to shutdown");
         }
+
+        Assertions.assertFalse(jar.isAlive(), "Process should be terminated after shutdown");
+
     }
 }
