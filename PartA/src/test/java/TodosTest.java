@@ -609,7 +609,7 @@ public class TodosTest {
             HttpClient.newHttpClient()
                     .send(request, HttpResponse.BodyHandlers.discarding());
         }catch (IOException | InterruptedException e){
-            System.out.println("Expected connection error due to shutdown");
+            Assertions.assertFalse(jar.isAlive(), "Process should be terminated after shutdown");
         }
 
         Assertions.assertFalse(jar.isAlive(), "Process should be terminated after shutdown");
