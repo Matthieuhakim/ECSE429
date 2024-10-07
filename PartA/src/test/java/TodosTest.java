@@ -2,13 +2,19 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.*;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 
 
 import static java.lang.Thread.sleep;
@@ -70,7 +76,6 @@ public class TodosTest {
         }
     }
 
-    //TODO: Undocumented feature. Add another test that should return 400 error
     // GET /todos?doneStatus=true
     @Test
     public void testGetTodosDoneStatusTrue() {
@@ -94,6 +99,52 @@ public class TodosTest {
         }
     }
 
+    // GET /todos?doneStatus=false
+    @Test
+    public void testGetTodosDoneStatusFalse() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos?doneStatus=false"))
+                .GET()
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+
+            // Check if the system returns its 1 element
+            JsonArray todosList = jsonResponse.get("todos").getAsJsonArray();
+            Assertions.assertEquals(2, todosList.size());
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // GET /todos?title=scan%20paperwork
+    @Test
+    public void testGetTodosTitle() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos?title=scan%20paperwork"))
+                .GET()
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+
+            // Check if the system returns its 1 element
+            JsonArray todosList = jsonResponse.get("todos").getAsJsonArray();
+            Assertions.assertEquals(1, todosList.size());
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
     // PUT /todos
     @Test
     public void testPutTodos() {
@@ -111,7 +162,7 @@ public class TodosTest {
         }
     }
 
-    // POST /todos
+    // POST /todos Json
     @Test
     public void testPostTodosJson() {
         JsonObject newTodo = new JsonObject();
@@ -134,6 +185,42 @@ public class TodosTest {
             Assertions.assertEquals("New Description", jsonResponse.get("description").getAsString());
             Assertions.assertFalse(jsonResponse.get("doneStatus").getAsBoolean());
         } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // POST /todos XML
+    @Test
+    public void testPostTodosXml() {
+        String newTodo = "<todo><title>New Todo</title><doneStatus>false</doneStatus><description>New Description</description></todo>";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos"))
+                .header("Content-Type", "application/xml")
+                .header("Accept", "application/xml")
+                .POST(HttpRequest.BodyPublishers.ofString(newTodo))
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(CREATED, response.statusCode());
+
+            // Parse the response body as XML
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new ByteArrayInputStream(response.body().getBytes(StandardCharsets.UTF_8)));
+
+            // Check content in response XML
+            NodeList titleNode = doc.getElementsByTagName("title");
+            NodeList doneStatusNode = doc.getElementsByTagName("doneStatus");
+            NodeList descriptionNode = doc.getElementsByTagName("description");
+
+            Assertions.assertEquals("New Todo", titleNode.item(0).getTextContent());
+            Assertions.assertEquals("false", doneStatusNode.item(0).getTextContent());
+            Assertions.assertEquals("New Description", descriptionNode.item(0).getTextContent());
+
+        } catch (IOException | InterruptedException | org.xml.sax.SAXException | javax.xml.parsers.ParserConfigurationException e) {
             e.printStackTrace();
         }
     }
@@ -277,10 +364,10 @@ public class TodosTest {
         }
     }
 
-    // TODO: Add test for POST PUT DELETE of /todos/:id
-    // POST /todos/:id valid id with no body
+    // POST /todos/:id valid id with no request body
+    //WARN: Test will fail because it should return 400 but returns 200
     @Test
-    public void testPostTodosId() {
+    public void testPostTodosIdNoBody() {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseURL + "/todos/1"))
                 .POST(HttpRequest.BodyPublishers.noBody())
@@ -289,12 +376,7 @@ public class TodosTest {
             HttpResponse<String> response = HttpClient.newHttpClient()
                     .send(request, HttpResponse.BodyHandlers.ofString());
 
-            JsonObject todo = JsonParser.parseString(response.body()).getAsJsonObject();
-
-            Assertions.assertEquals(SUCCESS, response.statusCode());
-            Assertions.assertEquals("scan paperwork", todo.get("title").getAsString());
-            Assertions.assertEquals("", todo.get("description").getAsString());
-            Assertions.assertFalse(todo.get("doneStatus").getAsBoolean());
+            Assertions.assertEquals(BAD_REQUEST, response.statusCode());
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
@@ -333,6 +415,101 @@ public class TodosTest {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseURL + "/todos/3"))
                 .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(NOT_FOUND, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // PUT /todos/:id No request Body
+    @Test
+    public void testPutTodosIdNoBody() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .PUT(HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(BAD_REQUEST, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // PUT /todos/:id with body
+    @Test
+    public void testPutTodosIdWithBody(){
+        JsonObject newTodo = new JsonObject();
+        newTodo.addProperty("title", "New Title");
+        newTodo.addProperty("doneStatus", true);
+        newTodo.addProperty("description", "New Description");
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(newTodo.toString()))
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+            Assertions.assertEquals("New Title", jsonResponse.get("title").getAsString());
+            Assertions.assertEquals("New Description", jsonResponse.get("description").getAsString());
+            Assertions.assertTrue(jsonResponse.get("doneStatus").getAsBoolean());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // PUT /todos/:id invalid id
+    @Test
+    public void testPutTodosInvalidId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/3"))
+                .PUT(HttpRequest.BodyPublishers.noBody())
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(NOT_FOUND, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // DELETE /todos/:id
+    @Test
+    public void testDeleteTodosId() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/1"))
+                .DELETE()
+                .build();
+        try{
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+
+            Assertions.assertEquals(SUCCESS, response.statusCode());
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // DELETE /todos/:id invalid id
+    @Test
+    public void testDeleteTodosIdNotFound() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseURL + "/todos/3"))
+                .DELETE()
                 .build();
         try{
             HttpResponse<String> response = HttpClient.newHttpClient()
