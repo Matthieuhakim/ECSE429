@@ -23,6 +23,7 @@ import static java.lang.Thread.sleep;
 public class TodosTest {
 
     public static Process jar;
+    private static MetricsRecorder metricsRecorder;
 
     static final String baseURL = "http://localhost:4567";
 
@@ -33,7 +34,22 @@ public class TodosTest {
     static final int METHOD_NOT_ALLOWED = 405;
 
     static final int sleepTime = 500;
+    private static final int[] objectCounts = {1, 20, 50, 70, 100, 500};
+    static final String csvFile = "todo_metrics.csv";
 
+    private JsonObject randomTodo;
+
+
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        metricsRecorder = new MetricsRecorder(csvFile);
+    }
+
+    @AfterAll
+    public static void tearDown() throws IOException {
+        metricsRecorder.close();
+    }
 
     @BeforeEach
     public void startServer() throws Exception {
@@ -654,5 +670,126 @@ public class TodosTest {
             e.printStackTrace();
         }
     }
+
+
+
+    // Testing /todos APIs with different number of objects
+
+    @Test
+    public void testCreateMultipleTodos() {
+        for (int numObjects : objectCounts) {
+            long startTime = System.currentTimeMillis();
+            for (int i = 0; i < numObjects; i++) {
+                randomTodo = RandomTodoGenerator.generateTodo();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(baseURL + "/todos"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(randomTodo.toString()))
+                        .build();
+                try {
+                    HttpClient.newHttpClient()
+                            .send(request, HttpResponse.BodyHandlers.ofString());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            long endTime = System.currentTimeMillis();
+            try {
+                metricsRecorder.recordMetrics("POST", numObjects, endTime - startTime);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Test
+    public void testDeleteMultipleTodos() {
+        for (int numObjects : objectCounts) {
+            // Create test objects first
+            for (int i = 0; i < numObjects; i++) {
+                randomTodo = RandomTodoGenerator.generateTodo();
+                HttpRequest createRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(baseURL + "/todos"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(randomTodo.toString()))
+                        .build();
+                try {
+                    HttpClient.newHttpClient()
+                            .send(createRequest, HttpResponse.BodyHandlers.ofString());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // Measure time for deleting objects
+            long startTime = System.currentTimeMillis();
+            for (int i = 0; i < numObjects; i++) {
+                HttpRequest deleteRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(baseURL + "/todos/" + i)) // Assuming IDs are sequential
+                        .DELETE()
+                        .build();
+                try {
+                    HttpClient.newHttpClient()
+                            .send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            long endTime = System.currentTimeMillis();
+
+            try {
+                metricsRecorder.recordMetrics("DELETE", numObjects, endTime - startTime);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Test
+    public void testUpdateMultipleTodos() {
+        for (int numObjects : objectCounts) {
+            // Create test objects first
+            for (int i = 0; i < numObjects; i++) {
+                randomTodo = RandomTodoGenerator.generateTodo();
+                HttpRequest createRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(baseURL + "/todos/" + i))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(randomTodo.toString()))
+                        .build();
+                try {
+                    HttpClient.newHttpClient()
+                            .send(createRequest, HttpResponse.BodyHandlers.ofString());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // Measure time for updating objects
+            long startTime = System.currentTimeMillis();
+            for (int i = 0; i < numObjects; i++) {
+                randomTodo = RandomTodoGenerator.generateTodo();
+                HttpRequest updateRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(baseURL + "/todos/" + i)) // Assuming IDs are sequential
+                        .header("Content-Type", "application/json")
+                        .PUT(HttpRequest.BodyPublishers.ofString(randomTodo.toString()))
+                        .build();
+                try {
+                    HttpClient.newHttpClient()
+                            .send(updateRequest, HttpResponse.BodyHandlers.ofString());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            long endTime = System.currentTimeMillis();
+
+            try {
+                metricsRecorder.recordMetrics("PUT", numObjects, endTime - startTime);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
 
 }
